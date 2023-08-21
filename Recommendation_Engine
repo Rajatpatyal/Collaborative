@@ -1,0 +1,47 @@
+from surprise import Dataset, Reader, KNNBasic
+from surprise.model_selection import train_test_split
+from surprise import accuracy
+import pandas as pd
+
+# Load your data (assuming you have a CSV file with columns: 'user', 'item', 'rating')
+data = pd.read_csv('ratings.csv')
+
+# Define the Reader object
+reader = Reader(rating_scale=(1, 5))
+
+# Load data into the Surprise Dataset format
+data = Dataset.load_from_df(data[['user', 'item', 'rating']], reader)
+
+# Split the data into training and testing sets
+trainset, testset = train_test_split(data, test_size=0.2)
+
+# Build the collaborative filtering model (KNNBasic)
+sim_options = {'name': 'cosine', 'user_based': True}  # User-based collaborative filtering
+model = KNNBasic(sim_options=sim_options)
+
+# Train the model on the training data
+model.fit(trainset)
+
+# Make predictions
+predictions = model.test(testset)
+
+# Evaluate the model's performance
+rmse = accuracy.rmse(predictions)
+print(f'RMSE: {rmse:.2f}')
+
+# Get top N recommendations for a user
+user_id = 1
+user_movies = data.df[data.df['user'] == user_id]['item']
+user_unrated_movies = [movie for movie in data.df['item'].unique() if movie not in user_movies]
+
+user_recs = []
+for movie_id in user_unrated_movies:
+    prediction = model.predict(user_id, movie_id)
+    user_recs.append((movie_id, prediction.est))
+
+# Get top 10 movie recommendations
+user_recs = sorted(user_recs, key=lambda x: x[1], reverse=True)[:10]
+recommended_movie_ids = [rec[0] for rec in user_recs]
+
+# Print recommended movie IDs
+print("Recommended movie IDs:", recommended_movie_ids)
